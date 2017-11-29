@@ -18,7 +18,7 @@ public class MigrationUtils {
 
     public static void runMigrations(String pattern) {
         try {
-            DataSourceMigrationManager manager = new DataSourceMigrationManager(DB.datasource);
+            DataSourceMigrationManager manager = new DataSourceMigrationManager(DB.getDataSource());
             ResourceMigrationResolver resolver = new ResourceMigrationResolver(pattern);
             manager.setMigrationResolver(resolver);
             manager.migrate();
