@@ -2,7 +2,9 @@
 
 <project name="carbonate" default="build" basedir=".">
 
-    <property name="play.path" value="../../play-1.2.2"/>
+    <target name="check" unless="play.path">
+        <fail message="Please specify Play framework path using -Dplay.path=/path/to/framework/home" />
+    </target>
 
     <path id="project.classpath">
         <pathelement path="${play.path}/framework/classes"/>
@@ -43,7 +45,7 @@
 
     <target name="compile">
         <mkdir dir="tmp/classes" />
-        <javac srcdir="src" destdir="tmp/classes" target="1.5" debug="true">
+        <javac srcdir="src" destdir="tmp/classes" target="1.8" debug="true">
             <classpath refid="project.classpath" />
         </javac>
     </target>
@@ -57,7 +59,6 @@
                 <include name="app/**"/>
                 <include name="src/**"/>
                 <include name="conf/**"/>
-                <include name="public/**"/>
                 <include name="lib/**"/>
                 <include name="documentation/**"/>
                 <include name="build.xml"/>

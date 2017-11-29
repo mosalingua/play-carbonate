@@ -1,43 +1,52 @@
 package play.modules.carbonate;
 
-import org.apache.commons.lang.StringUtils;
-import org.hibernate.dialect.Dialect;
-import org.hibernate.dialect.MySQL5Dialect;
-import org.hibernate.ejb.Ejb3Configuration;
-import org.hibernate.tool.hbm2ddl.DatabaseMetadata;
+import static java.lang.String.format;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.emptyMap;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Properties;
+
+import javax.persistence.Entity;
+
+import org.hibernate.boot.Metadata;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
+import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider;
+import org.hibernate.service.ServiceRegistry;
+import org.hibernate.tool.hbm2ddl.SchemaUpdate;
+import org.hibernate.tool.schema.TargetType;
+
 import play.Logger;
 import play.Play;
 import play.db.DB;
 import play.db.DBPlugin;
-import play.db.jpa.JPA;
-import play.db.jpa.JPAPlugin;
-import play.libs.IO;
-import play.templates.JavaExtensions;
 import play.utils.Utils;
-
-import javax.persistence.Entity;
-import java.io.*;
-import java.sql.SQLException;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Properties;
 
 /**
  * @author huljas
  */
 public class NewMigrationMain {
 
-    private static final SimpleDateFormat versionFormat = new SimpleDateFormat("yyyyMMddHHmmss");
-
     public static void main(String[] args) throws IOException, SQLException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Please give description for you migration:");
         String description = reader.readLine();
 
-        String appPath = System.getProperty("application.path",".");
+        String appPath = System.getProperty("application.path", ".");
         String id = System.getProperty("play.id", "");
         Play.init(new File(appPath), id);
 
@@ -47,58 +56,74 @@ public class NewMigrationMain {
             return;
         }
 
-        Ejb3Configuration configuration = new Ejb3Configuration();
-        String driver = Play.configuration.getProperty("db.driver");
-        String delimeter = Play.configuration.getProperty("carbonate.delimeter", ";");
-        String comment = Play.configuration.getProperty("carbonate.comment", "--");
-        String migrationBody = "";
+        Properties playConf = Play.configuration;
+        String driver = playConf.getProperty("db.driver");
         if (driver != null) {
             String dialectName = MigrationUtils.getDefaultDialect(driver);
-            configuration.setProperty("hibernate.dialect", dialectName);
-            Properties fromConf = (Properties) Utils.Maps.filterMap(Play.configuration, "^hibernate\\..*");
-            configuration.addProperties(fromConf);
-            List<Class> classes = Play.classloader.getAnnotatedClasses(Entity.class);
+            Properties fromConf = (Properties) Utils.Maps.filterMap(playConf, "^hibernate\\..*");
+            fromConf.setProperty("hibernate.dialect", dialectName);
+
             Thread.currentThread().setContextClassLoader(Play.classloader);
+            List<Class> classes = Play.classloader.getAnnotatedClasses(Entity.class);
+
             if (classes.isEmpty()) {
                 Logger.warn("No entities detected!");
+                return;
             }
-            for (Class clazz : classes) {
-                configuration.addAnnotatedClass(clazz);
+
+            File directory = new File(path);
+            if (!directory.exists()) {
+                Logger.warn("Creating non-existent directory %s", directory.getAbsolutePath());
+                directory.mkdirs();
             }
-            configuration.buildEntityManagerFactory();
-            DBPlugin plugin = new DBPlugin();
-            plugin.onApplicationStart();
-            Dialect dialect = (Dialect) Class.forName(dialectName).newInstance();
-            DatabaseMetadata metadata = new DatabaseMetadata(DB.getConnection(), dialect);
-            String[] content = configuration.getHibernateConfiguration().generateSchemaUpdateScript(dialect, metadata);
-            if (content.length == 0) {
-                Logger.warn("No changes from schema update!");
-            } else {
-                migrationBody = StringUtils.join(content, delimeter + "\n");
-                migrationBody += delimeter;
-                Logger.warn("Changes from schema update:\n" + migrationBody);
+
+            Date now = new Date();
+            String version = new SimpleDateFormat("yyyyMMddHHmmss").format(now);
+            String filename = description.codePoints()
+                .filter(ch -> ".,:;".indexOf(ch) < 0)
+                .map(ch -> ch == ' ' ? '-' : Character.toLowerCase(ch))
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                .toString();
+
+            File migrationFile = new File(directory, version + '_' + filename + ".sql");
+            migrationFile.createNewFile();
+            try (
+                OutputStream fos = new FileOutputStream(migrationFile);
+                Writer writer = new OutputStreamWriter(fos, UTF_8);
+            ) {
+                String comment = Play.configuration.getProperty("carbonate.comment", "--");
+                writer.append(comment).append(format(
+                    " %1$tF %<tT - Database migration generated by play-carbonate (https://github.com/mosalingua/play-carbonate)\n", now
+                ));
+                writer.append(comment).append(' ').append(description).append('\n');
             }
+
+            DBPlugin dbPlugin = new DBPlugin();
+            dbPlugin.onApplicationStart();
+
+            DatasourceConnectionProviderImpl connectionProvider = new DatasourceConnectionProviderImpl();
+            connectionProvider.setDataSource(DB.getDataSource());
+            // call of configure is required to set availability flag inside provider
+            connectionProvider.configure(emptyMap());
+
+            ServiceRegistry registry = new StandardServiceRegistryBuilder()
+                .applySettings(fromConf)
+                .addService(ConnectionProvider.class, connectionProvider)
+                .build();
+
+            MetadataSources metadataSources = new MetadataSources(registry);
+            classes.forEach(metadataSources::addAnnotatedClass);
+
+            Metadata metadata = metadataSources.buildMetadata();
+            new SchemaUpdate()
+                .setDelimiter(playConf.getProperty("carbonate.delimeter", ";"))
+                .setFormat(true)
+                .setOutputFile(migrationFile.getAbsolutePath())
+                .execute(EnumSet.of(TargetType.SCRIPT), metadata);
+
+            Logger.warn("New migration file created %s.", migrationFile.getAbsolutePath());
         } else {
             Logger.warn("Property 'db.driver' not defined in Play configuration, ignoring schema update!");
         }
-        File directory = new File(path);
-        if (!directory.exists()) {
-            Logger.warn("Creating non-existent directory " + directory.getAbsolutePath());
-            directory.mkdirs();
-        }
-        Date now = new Date();
-        String version = versionFormat.format(now);
-        String filename = StringUtils.replaceChars(description, ' ', '_');
-        filename = StringUtils.replaceChars(filename, ".,:;", "");
-        filename = filename.toLowerCase();
-        File migrationFile = new File(directory, version + "_" + filename + ".sql");
-        migrationFile.createNewFile();
-        PrintWriter writer = new PrintWriter(new FileWriter(migrationFile));
-
-        writer.println(comment + " " + String.format("%1$tF %<tT", now) + " - Database migration generated by play-carbonate (https://github.com/huljas/play-carbonate)");
-        writer.println(comment + " " + description);
-        writer.println(migrationBody);
-        writer.close();
-        Logger.warn("New migration file created " + migrationFile.getAbsolutePath());
     }
 }
