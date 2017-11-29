@@ -2,6 +2,11 @@
 *.iws
 *.pyc
 *.ipr
+.project
+.classpath
+.settings
+eclipse
 tmp/
 dist/
 lib/carbonate.jar
+test-result/
