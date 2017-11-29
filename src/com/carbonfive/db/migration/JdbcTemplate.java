@@ -17,15 +17,27 @@ public class JdbcTemplate {
     public Object execute(ConnectionCallback connectionCallback) throws MigrationException {
         Connection connection = null;
         try {
-            connection = dataSource.getConnection();
-            return connectionCallback.doInConnection(connection);
+            connection = this.dataSource.getConnection();
+            Object result = connectionCallback.doInConnection(connection);
+            if (!connection.getAutoCommit()) {
+                connection.commit();
+            }
+            return result;
         } catch (Exception e) {
-            throw new MigrationException(e);
+            MigrationException migrationException = new MigrationException(e);
+            try {
+                if (connection != null && !connection.getAutoCommit()) {
+                    connection.rollback();
+                }
+            } catch (SQLException sqle) {
+                migrationException.addSuppressed(sqle);
+            }
+            throw migrationException;
         } finally {
             try {
                 connection.close();
             } catch (Exception e) {
-
+                throw new MigrationException(e);
             }
         }
     }
