@@ -29,11 +29,7 @@ public class MigrationUtils {
 
     public static String getPath() {
         String path = Play.configuration.getProperty("carbonate.path");
-        if (path == null) {
-            return null;
-        } else {
-            return Play.applicationPath.getPath() + "/" + path;
-        }
+        return path == null ? null : Play.getFile(path).getPath();
     }
 
     public static String getDefaultDialect(String driver) {

@@ -10,8 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.*;
 
 public class DataSourceMigrationManager implements MigrationManager {
@@ -64,39 +62,36 @@ public class DataSourceMigrationManager implements MigrationManager {
 
         logger.info("Migrating database... applying " + pendingMigrations.size() + " migration" + (pendingMigrations.size() > 1 ? "s" : "") + ".");
 
+        jdbcTemplate.execute(connection -> {
+            Migration currentMigration = null;
 
-        jdbcTemplate.execute(new ConnectionCallback<Object>() {
-            public Object doInConnection(Connection connection) throws SQLException {
-                Migration currentMigration = null;
+            final boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
 
-                final boolean autoCommit = connection.getAutoCommit();
-                connection.setAutoCommit(false);
+            try {
+                for (Migration migration : pendingMigrations) {
+                    currentMigration = migration;
+                    logger.info("Running migration " + currentMigration.getFilename() + ".");
 
-                try {
-                    for (Migration migration : pendingMigrations) {
-                        currentMigration = migration;
-                        logger.info("Running migration " + currentMigration.getFilename() + ".");
+                    final Date startTime = new Date();
+                    StopWatch migrationWatch = new StopWatch();
+                    migrationWatch.start();
 
-                        final Date startTime = new Date();
-                        StopWatch migrationWatch = new StopWatch();
-                        migrationWatch.start();
+                    currentMigration.migrate(dbType, connection);
+                    versionStrategy.recordMigration(dbType, connection, currentMigration.getVersion(), startTime, migrationWatch.getTime());
 
-                        currentMigration.migrate(dbType, connection);
-                        versionStrategy.recordMigration(dbType, connection, currentMigration.getVersion(), startTime, migrationWatch.getTime());
-
-                        connection.commit();
-                    }
-                } catch (Throwable e) {
-                    assert currentMigration != null;
-                    String message = "Migration for version " + currentMigration.getVersion() + " failed, rolling back and terminating migration.";
-                    logger.error(message, e);
-                    connection.rollback();
-                    throw new MigrationException(message, e);
-                } finally {
-                    connection.setAutoCommit(autoCommit);
+                    connection.commit();
                 }
-                return null;
+            } catch (Throwable e) {
+                assert currentMigration != null;
+                String message = "Migration for version " + currentMigration.getVersion() + " failed, rolling back and terminating migration.";
+                logger.error(message, e);
+                connection.rollback();
+                throw new MigrationException(message, e);
+            } finally {
+                connection.setAutoCommit(autoCommit);
             }
+            return null;
         });
 
         watch.stop();
@@ -117,20 +112,12 @@ public class DataSourceMigrationManager implements MigrationManager {
     }
 
     protected DatabaseType determineDatabaseType() {
-        return (DatabaseType) jdbcTemplate.execute(new ConnectionCallback<DatabaseType>() {
-            public DatabaseType doInConnection(Connection connection) throws SQLException {
-                return DatabaseUtils.databaseType(connection.getMetaData().getURL());
-            }
-        });
+        return jdbcTemplate.execute(connection -> DatabaseUtils.databaseType(connection.getMetaData().getURL()));
     }
 
     protected boolean isMigrationsEnabled() {
         try {
-            return (Boolean) jdbcTemplate.execute(new ConnectionCallback<Boolean>() {
-                public Boolean doInConnection(Connection connection) throws SQLException {
-                    return versionStrategy.isEnabled(dbType, connection);
-                }
-            });
+            return jdbcTemplate.execute(connection -> versionStrategy.isEnabled(dbType, connection));
         } catch (MigrationException e) {
             logger.error("Could not enable migrations.", e);
             throw new MigrationException(e);
@@ -139,11 +126,9 @@ public class DataSourceMigrationManager implements MigrationManager {
 
     protected void enableMigrations() {
         try {
-            jdbcTemplate.execute(new ConnectionCallback<Object>() {
-                public Object doInConnection(Connection connection) throws SQLException {
-                    versionStrategy.enableVersioning(dbType, connection);
-                    return null;
-                }
+            jdbcTemplate.execute(connection -> {
+                versionStrategy.enableVersioning(dbType, connection);
+                return null;
             });
 
             logger.info("Successfully enabled migrations.");
@@ -154,11 +139,7 @@ public class DataSourceMigrationManager implements MigrationManager {
     }
 
     protected Set<String> determineAppliedMigrationVersions() {
-        return (Set<String>) jdbcTemplate.execute(new ConnectionCallback<Set<String>>() {
-            public Set<String> doInConnection(Connection connection) throws SQLException {
-                return versionStrategy.appliedMigrations(dbType, connection);
-            }
-        });
+        return jdbcTemplate.execute(connection -> versionStrategy.appliedMigrations(dbType, connection));
     }
 
     private static class PendingMigrationPredicate implements Predicate {
