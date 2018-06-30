@@ -14,11 +14,11 @@ public class JdbcTemplate {
         this.dataSource = dataSource;
     }
 
-    public Object execute(ConnectionCallback connectionCallback) throws MigrationException {
+    public <T> T execute(ConnectionCallback<T> connectionCallback) throws MigrationException {
         Connection connection = null;
         try {
             connection = this.dataSource.getConnection();
-            Object result = connectionCallback.doInConnection(connection);
+            T result = connectionCallback.doInConnection(connection);
             if (!connection.getAutoCommit()) {
                 connection.commit();
             }
