@@ -19,21 +19,21 @@ def execute(**kargs):
         try:
             subprocess.call(java_cmd, env=os.environ)
         except OSError:
-            print "Could not execute the java executable, please make sure the JAVA_HOME environment variable is set properly (the java executable should reside at JAVA_HOME/bin/java). "
+            print("Could not execute the java executable, please make sure the JAVA_HOME environment variable is set properly (the java executable should reside at JAVA_HOME/bin/java).")
             sys.exit(-1)
     elif command == "carbonate:apply":
         java_cmd = app.java_cmd(args, None, "play.modules.carbonate.ApplyMigrationsMain")
         try:
             subprocess.call(java_cmd, env=os.environ)
         except OSError:
-            print "Could not execute the java executable, please make sure the JAVA_HOME environment variable is set properly (the java executable should reside at JAVA_HOME/bin/java). "
+            print("Could not execute the java executable, please make sure the JAVA_HOME environment variable is set properly (the java executable should reside at JAVA_HOME/bin/java).")
             sys.exit(-1)
     else:
-        print "~ Carbonate module is used for managing your database changes."
-        print "~"
-        print "~ Usage:"
-        print "~ play carbonate:new   - Creates new database migration file, prefilled with changes detected between your database and model."
-        print "~ play carbonate:apply - Applies migrations to database."
+        print("~ Carbonate module is used for managing your database changes.")
+        print("~")
+        print("~ Usage:")
+        print("~ play carbonate:new   - Creates new database migration file, prefilled with changes detected between your database and model.")
+        print("~ play carbonate:apply - Applies migrations to database.")
 
 # This will be executed before any command (new, run...)
 def before(**kargs):

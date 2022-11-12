@@ -1,4 +1,4 @@
-self: com.mosalingua.play -> carbonate 1.5.1
+self: com.mosalingua.play -> carbonate 1.7.1
 
 require:
-    - play 1.5+
+    - play 1.7+
