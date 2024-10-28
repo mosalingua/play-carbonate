@@ -2,14 +2,9 @@ package play.modules.carbonate;
 
 import com.carbonfive.db.migration.DataSourceMigrationManager;
 import com.carbonfive.db.migration.ResourceMigrationResolver;
-import org.apache.commons.lang.StringUtils;
 import play.Play;
 import play.db.DB;
 import play.exceptions.UnexpectedException;
-
-import java.io.*;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 /**
  * @author huljas

@@ -46,7 +46,7 @@
 
     <target name="compile">
         <mkdir dir="tmp/classes" />
-        <javac srcdir="src" destdir="tmp/classes" target="11" debug="true">
+        <javac srcdir="src" destdir="tmp/classes" source ="17" target="17" release="17" debug="true">
             <classpath refid="project.classpath" />
         </javac>
     </target>

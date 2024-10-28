@@ -2,7 +2,7 @@ package com.carbonfive.db.migration;
 
 import com.carbonfive.jdbc.DatabaseType;
 import org.apache.commons.collections.Predicate;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Connection;
 

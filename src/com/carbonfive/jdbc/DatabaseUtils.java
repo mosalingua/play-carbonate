@@ -1,8 +1,8 @@
 package com.carbonfive.jdbc;
 
 import static com.carbonfive.jdbc.DatabaseType.*;
-import static org.apache.commons.lang.StringUtils.*;
-import org.apache.commons.lang.*;
+import static org.apache.commons.lang3.StringUtils.*;
+import org.apache.commons.lang3.*;
 
 public class DatabaseUtils
 {

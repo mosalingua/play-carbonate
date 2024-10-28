@@ -2,7 +2,6 @@ package com.carbonfive.db.migration;
 
 import com.carbonfive.jdbc.DatabaseType;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,7 +9,6 @@ import java.io.File;
 import java.util.*;
 
 import static org.apache.commons.collections.CollectionUtils.find;
-import static org.apache.commons.lang.StringUtils.isBlank;
 
 /**
  * A MigrationResolver which leverages Spring's robust Resource loading mechanism, supporting 'file:', 'classpath:', and standard url format resources.

@@ -64,7 +64,7 @@ public class NewMigrationMain {
             fromConf.setProperty("hibernate.dialect", dialectName);
 
             Thread.currentThread().setContextClassLoader(Play.classloader);
-            List<Class> classes = Play.classloader.getAnnotatedClasses(Entity.class);
+            List<Class<?>> classes = Play.classloader.getAnnotatedClasses(Entity.class);
 
             if (classes.isEmpty()) {
                 Logger.warn("No entities detected!");
